@@ -141,8 +141,9 @@ DEF_OPC(srl, "srl", RTYPE_SRL)
 DEF_OPC(sra, "sra", RTYPE_SRA)
 DEF_OPC(or, "or", RTYPE_OR)
 DEF_OPC(and, "and", RTYPE_AND)
+DEF_OPC(mask, "mask", RTYPE_MASK)
 
-set opc_rtype_alu = opc_add, opc_sub, opc_sll, opc_slt, opc_sltu, opc_xor, opc_srl, opc_sra, opc_or, opc_and;
+set opc_rtype_alu = opc_add, opc_sub, opc_sll, opc_slt, opc_sltu, opc_xor, opc_srl, opc_sra, opc_or, opc_and, opc_mask;
 
 element i_rtype_alu           // define the instruction for the rtype arithmetic opcodes
 {
@@ -189,11 +190,7 @@ element i_rtype_alu           // define the instruction for the rtype arithmetic
                 result = src1 << src2;
                 break;
             case RTYPE_SLT:
-#ifdef OPTION_RTYPE_REGRESSION_TEST
-                if (((uint32) src1) < ((uint32) src2)) result = 1;
-#else
                 if (((int32) src1) < ((int32) src2)) result = 1;
-#endif
                 else result = 0;
                 break;
             case RTYPE_SLTU:
@@ -215,6 +212,9 @@ element i_rtype_alu           // define the instruction for the rtype arithmetic
             case RTYPE_AND:
                 result = src1 & src2;
                 break;
+            case RTYPE_MASK:
+                result = ~src1 & src2;
+                break;
             default:
                 result = 0;
 //                eprintf("Default case: %d", opc);
@@ -228,9 +228,9 @@ element i_rtype_alu           // define the instruction for the rtype arithmetic
 
 // Combine the immediate shift instructions that are specialized itype set of instructions
 
-DEF_OPC(slli, "slli", RTYPE_SLLI)
-DEF_OPC(srli, "srli", RTYPE_SRLI)
-DEF_OPC(srai, "srai", RTYPE_SRAI)
+DEF_OPC(slli, "slli", IMM_SHIFT_SLLI)
+DEF_OPC(srli, "srli", IMM_SHIFT_SRLI)
+DEF_OPC(srai, "srai", IMM_SHIFT_SRAI)
 
 set opc_shift_imm = opc_slli, opc_srli, opc_srai;
 
@@ -250,19 +250,14 @@ element i_shift_imm                     // define the instruction for the shift 
         immediate = (uint5) imm;
 
         switch (opc) {
-            case RTYPE_SLLI:
+            case IMM_SHIFT_SLLI:
                 result = (uint32)src1 << immediate;
                 break;
-            case RTYPE_SRLI:
+            case IMM_SHIFT_SRLI:
                 result = (uint32)src1 >> immediate;
                 break;
-            case RTYPE_SRAI:
-#ifdef OPTION_SHIFT_IMM_REGRESSION_TEST
-                result = ((uint32) src1) >> immediate;
-#else
+            case IMM_SHIFT_SRAI:
                 result = ((int32) src1) >> immediate;
-
-#endif
                 break;
             default:
                 result = 0;
@@ -320,11 +315,7 @@ element i_itype_alu
                 result = src1 | immediate;
                 break;
             case ITYPE_ANDI:
-#ifdef OPTION_ITYPE_REGRESSION_TEST
-                result = src1 | immediate;
-#else
                 result = src1 & immediate;
-#endif
                 break;
             default:
                 result = 0;
@@ -388,16 +379,7 @@ element i_stype_store
     semantics {
         uint32 address, result;
 
-#ifdef OPTION_STYPE_REGRESSION_TEST
-        if ((rs2 != 1) && (rs2 != 2)) {
-            address = rf_xpr_read(rs1) + (uint12) simm;
-        }
-        else {
-            address = rf_xpr_read(rs1) + (int32) simm;
-        }
-#else
         address = rf_xpr_read(rs1) + (int32) simm;
-#endif
         result = rf_xpr_read(rs2);
         store(opc, address, result);
 
@@ -477,11 +459,7 @@ element i_jtype_jlink
         if (opc == JTYPE_JAL) {
             current_pc = read_pc();                         // Current PC is already pointing to pc of instruction + 4
             rf_xpr_write(current_pc, rd);
-#ifdef OPTION_JTYPE_REGRESSION_TEST
-            target_address = current_pc + simm;  // offset is based on the pc of the jal instruction
-#else
             target_address = current_pc + simm - RISCV_INSTR_SIZE;  // offset is based on the pc of the jal instruction
-#endif
             write_pc(target_address);
         } else {
 //                eprintf("Default case: %d", opc);
@@ -567,11 +545,7 @@ element i_btype_branches
                 result = ((int32) src1 >= (int32) src2) ? 1 : 0;
                 break;
             case BTYPE_BLTU:
-#ifdef OPTION_BTYPE_REGRESSION_TEST
-                result = ((int32) src1 < (int32) src2) ? 1 : 0;
-#else
                 result = ((uint32) src1 < (uint32) src2) ? 1 : 0;
-#endif
                 break;
             case BTYPE_BGEU:
                 result = ((uint32) src1 >= (uint32) src2) ? 1 : 0;
@@ -1049,7 +1023,7 @@ emulation e_movi32
 //
 //    use i_utype_ops as i_lui0, i_lui1;
 //    use i_rtype_alu as i_or;
-//    use i_rtype_shift as i_srli;
+//    use i_imm_shift as i_srli;
 //    use i_itype_jlreg as i_jal_reg;
 //
 //    unsigned attribute bit[32] imm32;
