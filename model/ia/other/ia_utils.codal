@@ -83,13 +83,13 @@ uint32 load(const uint32 opc, const uint32 address)
 #endif
     switch (opc) {
         case ITYPE_LB:
-#ifdef OPTION_LOAD_REGRESSION_TEST
-            return (uint32)(uint8) result;        // sign extend a signed byte load operation
-#else
             return (int32)(int8) result;        // sign extend a signed byte load operation
-#endif
         case ITYPE_LH:
+#ifdef OPTION_LOAD_REGRESSION_TEST
+            return (uint32)(uint16) result;       // sign extend a signed halfword load operation
+#else
             return (int32)(int16) result;       // sign extend a signed halfword load operation
+#endif
         case ITYPE_LBU:                         // Unsigned byte and halfword loads do not
         case ITYPE_LHU:                         // require sign extension and can result in
         case ITYPE_LW:                          // immediate return
@@ -128,10 +128,18 @@ void store(const uint32 opc, const uint32 address, const uint32 result)
 
     // Data interface write
 #ifdef OPTION_CACHES_ENABLED
+#ifdef OPTION_STYPE_REGRESSION_TEST
+    idcache.if_dcache.write(result, address, 2, cache_resp, pma_hprot(address, CP_AHB_DATA_ACCESS), CP_AHB_UNLOCK);
+#else
     idcache.if_dcache.write(result, address, byte_count, cache_resp, pma_hprot(address, CP_AHB_DATA_ACCESS), CP_AHB_UNLOCK);
+#endif
     dprintf("st %08x -> [%08x] ", result, address);
 #else
+#ifdef OPTION_STYPE_REGRESSION_TEST
+    ldst.write(result, address, 2, cache_resp, pma_hprot(address, CP_AHB_DATA_ACCESS), CP_AHB_UNLOCK);
+#else
     ldst.write(result, address, byte_count, cache_resp, pma_hprot(address, CP_AHB_DATA_ACCESS), CP_AHB_UNLOCK);
+#endif
     dprintf("st %08x -> [%08x] ", result, address);
 #endif
 }
